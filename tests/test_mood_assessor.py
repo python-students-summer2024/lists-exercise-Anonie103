@@ -3,7 +3,7 @@ import datetime
 import os
 from pathlib import Path
 import logging
-from freezegun import freeze_time
+#from freezegun import freeze_time
 from mood_assessor import assess_mood
 
 
@@ -70,7 +70,7 @@ class Tests:
         self.mock_input(mock_data, call_counter, monkeypatch)
 
         # freeze the time
-        with freeze_time(mock_data["today"][0]) as frozen_time:
+        #with freeze_time(mock_data["today"][0]) as frozen_time:
             # run the program on the different days
             for i in range(num_days):
                 # set the date today to the next mock date
