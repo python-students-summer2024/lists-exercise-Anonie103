@@ -1,8 +1,24 @@
 import os
-from datetime import date, timedelta
-from pathlib import Path
+import datetime
 
-def get_mood_value(mood):
+def get_today_date():
+    return str(datetime.date.today())
+
+def read_mood_diary(file_path):
+    if not os.path.exists(file_path):
+        return []
+    with open(file_path, 'r') as file:
+        return file.readlines()
+
+def write_mood_diary(file_path, date_today, mood_value):
+    with open(file_path, 'a') as file:
+        file.write(f"{date_today},{mood_value}\n")
+
+def validate_mood(mood):
+    valid_moods = ["happy", "relaxed", "apathetic", "sad", "angry"]
+    return mood in valid_moods
+
+def mood_to_value(mood):
     mood_values = {
         "happy": 2,
         "relaxed": 1,
@@ -10,67 +26,63 @@ def get_mood_value(mood):
         "sad": -1,
         "angry": -2
     }
-    return mood_values.get(mood.lower(), None)
+    return mood_values[mood]
 
-def get_mood_diary_path():
-    data_dir = Path("data")
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir / "mood_diary.txt"
+def assess_mood():
+    data_dir = "data"
+    os.makedirs(data_dir, exist_ok=True)
+    file_path = os.path.join(data_dir, "mood_diary.txt")
 
-def assess_mood(mood_input=None):
-    mood_diary_path = get_mood_diary_path()
-    today = date.today()
+    date_today = get_today_date()
+    mood_entries = read_mood_diary(file_path)
 
-    # Check if a mood has already been entered for today
-    with open(mood_diary_path, "r") as f:
-        for line in f:
-            entry_date = date.fromisoformat(line.split(",")[0])
-            if entry_date == today:
-                print("You have already entered your mood for today.")
-                return
+    if any(date_today in entry for entry in mood_entries):
+        print("Sorry, you have already entered your mood today.")
+        return
 
-    # Get mood input (or use provided input for testing)
-    if mood_input is None:
-        while True:
-            mood = input("Enter your current mood (happy, relaxed, apathetic, sad, angry): ").lower()
-            mood_value = get_mood_value(mood)
-            if mood_value is not None:
-                break
-            print("Invalid mood. Please try again.")
-    else:
-        mood_value = get_mood_value(mood_input)
-        if mood_value is None:
-            raise ValueError(f"Invalid mood: {mood_input}")
+    while True:
+        mood = input("Enter your current mood (happy, relaxed, apathetic, sad, angry): ").strip().lower()
+        if validate_mood(mood):
+            break
+        print("Invalid mood. Please enter a valid mood.")
 
-    # Store the mood entry in the mood diary file
-    with open(mood_diary_path, "a") as f:
-        f.write(f"{today.isoformat()},{mood_value}\n")
+    mood_value = mood_to_value(mood)
+    write_mood_diary(file_path, date_today, mood_value)
 
-    # Analyze the last 7 days of mood entries
-    mood_entries = []
-    with open(mood_diary_path, "r") as f:
-        for line in f:
-            entry_date, entry_value = line.strip().split(",")
-            entry_date = date.fromisoformat(entry_date)
-            if entry_date >= today - timedelta(days=7):
-                mood_entries.append(int(entry_value))
+    if len(mood_entries) >= 6:
+        recent_entries = mood_entries[-6:] + [f"{date_today},{mood_value}\n"]
+        mood_values = [int(entry.strip().split(',')[1]) for entry in recent_entries]
 
-    # Diagnose mood disorder based on the last 7 days of entries
-    num_happy = mood_entries.count(2)
-    num_sad = mood_entries.count(-1)
-    num_apathetic = mood_entries.count(0)
+        diagnosis = diagnose_mood(mood_values)
+        print(f"Your diagnosis: {diagnosis}!")
 
-    if num_sad >= 4:
-        print("Based on your recent mood entries, you may be experiencing depression.")
-    elif num_happy >= 5:
-        print("Based on your recent mood entries, you may be experiencing mania.")
-    elif num_apathetic >= 6:
-        print("Based on your recent mood entries, you may be experiencing a schizoid disorder.")
-    else:
-        average_mood = sum(mood_entries) / len(mood_entries)
-        if average_mood >= 1:
-            print("Based on your recent mood entries, your average mood is relaxed.")
-        elif average_mood == 0:
-            print("Based on your recent mood entries, your average mood is apathetic.")
-        else:
-            print("Based on your recent mood entries, your average mood is sad or angry.")
+def diagnose_mood(mood_values):
+    mood_count = {"happy": 0, "relaxed": 0, "apathetic": 0, "sad": 0, "angry": 0}
+    for value in mood_values:
+        if value == 2:
+            mood_count["happy"] += 1
+        elif value == 1:
+            mood_count["relaxed"] += 1
+        elif value == 0:
+            mood_count["apathetic"] += 1
+        elif value == -1:
+            mood_count["sad"] += 1
+        elif value == -2:
+            mood_count["angry"] += 1
+
+    if mood_count["happy"] >= 5:
+        return "manic"
+    if mood_count["sad"] >= 4:
+        return "depressive"
+    if mood_count["apathetic"] >= 6:
+        return "schizoid"
+
+    average_mood_value = round(sum(mood_values) / len(mood_values))
+    mood_value_to_name = {
+        2: "happy",
+        1: "relaxed",
+        0: "apathetic",
+        -1: "sad",
+        -2: "angry"
+    }
+    return mood_value_to_name.get(average_mood_value, "unknown")
